@@ -10,7 +10,10 @@ from selenium.webdriver.chrome.options import Options
 import re
 from PyQt5 import QtWidgets, QtCore
 from PyQt5.QtWidgets import QApplication, QMainWindow
-import sys
+import requests
+from bs4 import BeautifulSoup
+import lxml
+import time
 import sqlite3
 
 class Ui_MainWindow(object):
@@ -48,14 +51,21 @@ class Ui_MainWindow(object):
         self.label_stop = QtWidgets.QLabel(self.centralwidget)
         self.label_stop.setGeometry(QtCore.QRect(10, 380, 161, 16))
         self.label_stop.setObjectName("label_stop")
+        self.progressBar = QtWidgets.QProgressBar(self.centralwidget)
+        self.progressBar.setGeometry(QtCore.QRect(10, 440, 781, 23))
+        self.progressBar.setProperty("value", 0)
+        self.progressBar.setObjectName("progressBar")
         MainWindow.setCentralWidget(self.centralwidget)
         self.statusbar = QtWidgets.QStatusBar(MainWindow)
         self.statusbar.setObjectName("statusbar")
         MainWindow.setStatusBar(self.statusbar)
-
+        self.status_label = QtWidgets.QLabel(self.centralwidget)
+        self.status_label.setGeometry(QtCore.QRect(10, 470, 781, 20))
+        self.status_label.setObjectName("status_label")
+        self.status_label.setStyleSheet("color: green; background-color: black;")
         self.retranslateUi(MainWindow)
         QtCore.QMetaObject.connectSlotsByName(MainWindow)
-        self.pushButton.clicked.connect(self.on_pushButton_clicked)
+        self.pushButton.clicked.connect(self.on_pushButton_clicked)  # Соединяем событие нажатия на кнопку с методом
 
 
     def retranslateUi(self, MainWindow):
@@ -66,26 +76,18 @@ class Ui_MainWindow(object):
         self.label_link.setText(_translate("MainWindow", "Введите ссылку:"))
         self.label_start.setText(_translate("MainWindow", "С какой страницы начать:"))
         self.label_stop.setText(_translate("MainWindow", "Сколько номеров записать:"))
+        self.status_label.setText(_translate("MainWindow", "Ожидание запуска..."))
+
 
     def on_pushButton_clicked(self):
+
+        
         url_template = self.line_link.text()
         offset = int(self.line_num.text())
-        start =int(self.line_start.text())
+        start =int(self.line_start.text()) - 1 if int(self.line_start.text()) != 0 else 0
         stop = int(self.lineEdit.text())
-
-        conn = sqlite3.connect('phonebook.db')
-        cursor = conn.cursor()
-
-        cursor.execute('CREATE TABLE IF NOT EXISTS phonebook (id INTEGER PRIMARY KEY AUTOINCREMENT, title TEXT, number TEXT)')
-
-        options = Options()
-        options.add_argument("--disable-notifications")
-        options.add_argument("--disable-infobars")
-        options.add_argument("--mute-audio")
-        options.add_argument("user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/58.0.3029.110 Safari/537.3")
-
-        # Указываем путь к драйверу Chrome
-        s = Service('./chromedriver.exe')
+        print('started')
+        
         num = 0
         # Создаём экземпляр драйвера
         driver = webdriver.Chrome(service=s, options=options)
@@ -162,3 +164,4 @@ if __name__ == "__main__":
     ui.setupUi(MainWindow)
     MainWindow.show()
     sys.exit(app.exec_())
+    
