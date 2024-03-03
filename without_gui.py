@@ -1,4 +1,3 @@
-import requests
 from bs4 import BeautifulSoup
 import lxml
 import time
@@ -16,7 +15,7 @@ stop = 0
 offset = 100
 un = 0
 
-url_template = 'https://auto.ria.com/uk/legkovie/?page=1'
+url_template = 'https://auto.ria.com/uk/search/?lang_id=4&page=1&countpage=100&category_id=1&custom=1&abroad=2'
 
 
 async def fetch(session, url):
@@ -56,6 +55,8 @@ async def take_link(start, offset, url_template, lk):
                 print(f'links_processed  --- {links_processed} - of - {offset * 10}')
             
 async def main(un, start, stop, offset, url_template, lk):
+    er = 0
+    er1 = 0
     conn = sqlite3.connect('phonebook.db')
     cursor = conn.cursor()
     cursor.execute('CREATE TABLE IF NOT EXISTS phonebook (id INTEGER PRIMARY KEY AUTOINCREMENT, title TEXT, number TEXT)')
@@ -67,43 +68,56 @@ async def main(un, start, stop, offset, url_template, lk):
     
     tasks = []
     async with aiohttp.ClientSession() as session:
+    
         for link in lk:
-            tasks.append(fetch(session, link))
+            try:
+                tasks.append(fetch(session, link))
+            except:
+                er+=1
+
+                print(f'error catch link {er}')
 
         responses = await asyncio.gather(*tasks)
         for response_text in responses:
-            soup = BeautifulSoup(response_text, 'lxml')
-            script_tags = soup.select('script[class^="js-user-secure-"]')
-            
-
-            for script_tag in script_tags:
-                data_hash = script_tag['data-hash']
-                data_expire = script_tag['data-expires']
-                order_id = soup.body['data-auto-id']
-                response = await fetch_json(session, f'https://auto.ria.com/users/phones/{order_id}?hash={data_hash}&expires={data_expire}')
-
-                title = 'Я'
-                number = response['formattedPhoneNumber']
+            try:
+                soup = BeautifulSoup(response_text, 'lxml')
+                script_tags = soup.select('script[class^="js-user-secure-"]')
                 
-                number = re.sub('[^0-9]', '', number)  
-                cursor.execute('SELECT * FROM phonebook WHERE number=?', (number,))
-                result = cursor.fetchone()
-                if not result:
-                    cursor.execute('INSERT INTO phonebook (title, number) VALUES (?, ?)', (title, number))
-                    conn.commit()
 
-                    un += 1
+                for script_tag in script_tags:
+                    data_hash = script_tag['data-hash']
+                    data_expire = script_tag['data-expires']
+                    order_id = soup.body['data-auto-id']
+                    response = await fetch_json(session, f'https://auto.ria.com/users/phones/{order_id}?hash={data_hash}&expires={data_expire}')
 
-                    print(f"{response['formattedPhoneNumber']} ( uniqu )  --- {un}")
-                    with open('contacts_1.vcf', 'a', encoding='utf-8') as f:       
-                        f.write(f'BEGIN:VCARD\nVERSION:3.0\nN:{title}\nTEL;TYPE=CELL:{number}\nEND:VCARD\n')
-                    progress_value = int(progress_step * un)
-                    if stop != 0 and un == stop:
-                        return 0
-                else:
-                    un += 1
-                    print(f"{response['formattedPhoneNumber']} ( NOT-uniqu )  --- {un}")
+                    title = 'Я'
+                    number = response['formattedPhoneNumber']
+                    
+                    number = re.sub('[^0-9]', '', number)  
+                    cursor.execute('SELECT * FROM phonebook WHERE number=?', (number,))
+                    result = cursor.fetchone()
+                    if not result:
+                        cursor.execute('INSERT INTO phonebook (title, number) VALUES (?, ?)', (title, number))
+                        conn.commit()
 
+                        un += 1
+
+                        print(f"{response['formattedPhoneNumber']} ( uniqu )  --- {un}")
+                        with open('contacts_1.vcf', 'a', encoding='utf-8') as f:       
+                            f.write(f'BEGIN:VCARD\nVERSION:3.0\nN:{title}\nTEL;TYPE=CELL:{number}\nEND:VCARD\n')
+                        progress_value = int(progress_step * un)
+                        if stop != 0 and un == stop:
+                            return 0
+                    else:
+                        un += 1
+                        print(f"{response['formattedPhoneNumber']} ( NOT-uniqu )  --- {un}")
+            
+            except:
+                er1+=1
+
+                print(f'error catch phone {er1}')
+
+        
     print(f'{un} numbers processed')
     
 
